@@ -1,0 +1,29 @@
+const express = require("express");
+const app = express();
+const PORT = 3000;
+
+app.use(express.json());
+
+
+let users = [
+  { id: 1, name: "Abhin", course: "Electronics" },
+  { id: 2, name: "Aibel", course: "Biomedical" }
+];
+
+
+app.get("/users", (req, res) => {
+  res.json(users);
+});
+
+
+app.post("/users", (req, res) => {
+  const newUser = req.body;
+  
+  newUser.id = users.length + 1;
+  users.push(newUser);
+  res.status(201).json({ message: "User added successfully", user: newUser });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
