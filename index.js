@@ -119,9 +119,6 @@ function helloWorld(req, res) {
 }
 app.get("/", helloWorld);
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
 // NEW: Get user's own messages
 app.get("/my-messages/:username", async (req, res) => {
   const { username } = req.params;
@@ -136,4 +133,65 @@ app.get("/my-messages/:username", async (req, res) => {
     console.error("Error fetching user's messages:", error);
     res.status(500).json({ error: "Failed to fetch user's messages" });
   }
+});
+const { createServer } = require("http");
+const { Server } = require("socket.io");
+
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+const userMap = new Map();
+
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+  socket.emit("join");
+  socket.on("join", (username) => {
+    userMap.set(username, socket.id);
+    console.log(`User ${username} joined with socket ID: ${socket.id}`);
+  });
+});
+
+// Update sendMessage to use socket.io
+async function sendMessageSocket(req, res) {
+  const { sender, receiver, message } = req.body;
+  console.log("Received message:", { sender, receiver, message });
+
+  try {
+    const newMessage = new Message({ sender, receiver, message });
+    await newMessage.save();
+
+    // Push message into sender and receiver's messages array
+    await User.findOneAndUpdate(
+      { username: sender },
+      { $push: { messages: { sender, receiver, message } } }
+    );
+
+    await User.findOneAndUpdate(
+      { username: receiver },
+      { $push: { messages: { sender, receiver, message } } }
+    );
+
+    // Emit message to receiver if they are online
+    if (userMap.has(receiver)) {
+      io.to(userMap.get(receiver)).emit("message", newMessage);
+    }
+
+    res.status(201).json({ message: "Message sent successfully" });
+  } catch (error) {
+    console.error("Error sending message:", error);
+    res.status(500).json({ error: "Failed to send message" });
+  }
+}
+
+// Replace existing sendMessage route with the socket-enabled one
+app.post("/send-message", sendMessageSocket);
+
+// Update app.listen to use httpServer
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
 });
