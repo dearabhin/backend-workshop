@@ -1,9 +1,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 const app = express();
 const PORT = 3000;
-
+app.use(cors());
 app.use(express.json());
 
 // MongoDB connection
@@ -101,6 +102,7 @@ async function login(req, res) {
 
 app.post("/login", login);
 
+
 // Get all users
 app.get("/users", async (req, res) => {
   try {
@@ -119,4 +121,19 @@ app.get("/", helloWorld);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+// NEW: Get user's own messages
+app.get("/my-messages/:username", async (req, res) => {
+  const { username } = req.params;
+
+  try {
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json(user.messages);
+  } catch (error) {
+    console.error("Error fetching user's messages:", error);
+    res.status(500).json({ error: "Failed to fetch user's messages" });
+  }
 });
